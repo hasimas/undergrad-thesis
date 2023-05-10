@@ -1,0 +1,280 @@
+---
+title: "SHPM"
+author: "Hasyim"
+date: "5/8/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+Package Prep.
+```{r Setup, include=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+library(tidyverse)
+library(ggthemes)
+library(haven)
+library(tinytex)
+library(stargazer)
+library(rio)
+library(micEconAids)
+library(purrr)
+library(pubh)
+library(expss)
+```
+
+Import Dataset.
+```{r Import, include=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+KonsMakanan <- read_dta("KONS_AIDS2.dta")
+KOR <- read_dta("KOR.dta")
+KonsNonMakanan <- read_dta("KonsNon.dta")
+```
+
+Merge Dataset.
+```{r Merge, include=FALSE, message=FALSE, warning=FALSE}
+KonsFinal <- left_join(KOR, KonsNonMakanan, by=c("id", "provinsi", "kabupaten", "klas")) %>% select(-urut_art, -wert)
+
+Mie <- KonsMakanan %>% filter(kode == 212) %>% filter(p!=0)
+KonsFinal <- left_join(KonsFinal, Mie, by="id") %>% rename(pm = p, qm = q) %>% select(-kode) %>% drop_na()
+rm(Mie)
+
+Dagol <- KonsMakanan %>% filter(kode == 216) %>% filter(p!=0)
+KonsFinal <- left_join(KonsFinal, Dagol, by="id") %>% rename(pd = p, qd = q) %>% select(-kode) %>% drop_na()
+rm(Dagol)
+
+Snack <- KonsMakanan %>% filter(kode == 213) %>% filter(p!=0)
+KonsFinal <- left_join(KonsFinal, Snack, by="id") %>% rename(ps = p, qs = q) %>% select(-kode) %>% drop_na()
+rm(Snack)
+
+Teh <- KonsMakanan %>% filter(kode == 222) %>% filter(p!=0)
+KonsFinal <- left_join(KonsFinal, Teh, by="id") %>% rename(pt = p, qt = q) %>% select(-kode) %>% drop_na()
+rm(Teh) #222 = TEH kalau 224 = KARBONATED
+```
+
+Outlier Check & Treatment.
+```{r Outlier, include=FALSE, message=FALSE, warning=FALSE}
+#### Outlier Check Expenditure ####
+hist(KonsFinal$expend,
+     main = "Histogram of Family Expenditure Per Capita (Before Treatment)",
+     xlab = "Family Expenditure (Rp)")
+boxplot(KonsFinal$expend, horizontal = T,
+     main = "Boxplot of Family Expenditure Per Capita (Before Treatment)",
+     xlab = "Family Expenditure (Rp)")
+KonsFinal2 <- KonsFinal %>% filter(expend<11200000) #Treatment
+boxplot(KonsFinal2$expend, horizontal = T,
+     main = "Boxplot of Family Expenditure Per Capita (After Treatment)",
+     xlab = "Family Expenditure (Rp)")
+hist(KonsFinal2$expend,
+     main = "Histogram of Family Expenditure Per Capita (After Treatment)",
+     xlab = "Family Expenditure (Rp)")
+
+#### Outlier Check Family Size ####
+hist(KonsFinal2$art,
+     main = "Histogram of Family Size Per Capita (Before Treatment)",
+     xlab = "Family Size")
+boxplot(KonsFinal2$art, horizontal = T,
+     main = "Boxplot of Family Size Per Capita (Before Treatment)",
+     xlab = "Family Size")
+KonsFinal3 <- KonsFinal2 %>% filter(art<10) #Treatment
+boxplot(KonsFinal3$art, horizontal = T,
+     main = "Boxplot of Family Size Per Capita (After Treatment)",
+     xlab = "Family Size")
+hist(KonsFinal3$art,
+     main = "Histogram of Family Size Per Capita (After Treatment)",
+     xlab = "Family Size")
+
+#### Outlier Check Noodle ####
+hist(KonsFinal3$qm,
+     main = "Histogram of Weekly Noodle Consumption (Before Treatment)",
+     xlab = "Instant Noodle Consumption (Portion)")
+boxplot(KonsFinal3$qm, horizontal = T,
+     main = "Boxplot of Weekly Noodle Consumption (Before Treatment)",
+     xlab = "Instant Noodle Consumption (Portion)")
+KonsFinal4 <- KonsFinal3 %>% filter(qm<6.3) #Treatment
+boxplot(KonsFinal4$qm, horizontal = T,
+     main = "Boxplot of Weekly Noodle Consumption (After Treatment)",
+     xlab = "Instant Noodle Consumption (Portion)")
+hist(KonsFinal4$qm,
+     main = "Histogram of Weekly Noodle Consumption (After Treatment)",
+     xlab = "Instant Noodle Consumption (Portion)")
+
+#### Outlier Check Snack ####
+hist(KonsFinal4$qs,
+     main = "Histogram of Weekly Snack Consumption (Before Treatment)",
+     xlab = "Weekly Snack Consumption (Ons)")
+boxplot(KonsFinal4$qs, horizontal = T,
+     main = "Boxplot of Weekly Snack Consumption (Before Treatment)",
+     xlab = "Weekly Snack Consumption (Ons)")
+
+#### Outlier Check Processed Meat ####
+hist(KonsFinal4$qd,
+     main = "Histogram of Weekly Processed Meat Cons. (Before Treatment)",
+     xlab = "Weekly Processed Meat Cons. (Slice/Piece)")
+boxplot(KonsFinal4$qd, horizontal = T,
+     main = "Boxplot of Weekly Processed Meat Cons. (Before Treatment)",
+     xlab = "Weekly Processed Meat Cons. (Slice/Piece)")
+KonsFinal5 <- KonsFinal4 %>% filter(qd<15) #Treatment
+boxplot(KonsFinal5$qd, horizontal = T,
+     main = "Boxplot of Weekly Processed Meat Cons. (After Treatment)",
+     xlab = "Weekly Processed Meat Cons. (Slice/Piece)")
+hist(KonsFinal5$qd,
+     main = "Histogram of Weekly Processed Meat Cons. (After Treatment)",
+     xlab = "Weekly Processed Meat Cons. (Slice/Piece)")
+
+#### Outlier Check Bottled Tea ####
+hist(KonsFinal5$qt,
+     main = "Histogram of Weekly Bottled Tea Cons. (Before Treatment)",
+     xlab = "Weekly Bottled Tea Cons. (250ml)")
+boxplot(KonsFinal5$qt, horizontal = T,
+     main = "Boxplot of Weekly Bottled Tea Cons. (Before Treatment)",
+     xlab = "Weekly Bottled Tea Cons. (250ml)")
+KonsFinal6 <- KonsFinal5 %>% filter(qt<11) #Treatment
+boxplot(KonsFinal6$qt, horizontal = T,
+     main = "Boxplot of Weekly Bottled Tea Cons. (After Treatment)",
+     xlab = "Weekly Bottled Tea Cons. (250ml)")
+hist(KonsFinal6$qt,
+     main = "Histogram of Weekly Bottled Tea Cons. (After Treatment)",
+     xlab = "Weekly Bottled Tea Cons. (250ml)")
+
+rm(KonsFinal2, KonsFinal3, KonsFinal4, KonsFinal5)
+```
+
+Generate M and W for each ID.
+```{r M & W, include=FALSE, message=FALSE, warning=FALSE}
+
+KonsFinal6 <- KonsFinal6 %>% mutate(M = (pm * qm) + (ps * qs) + (pd * qd) + (pt * qt))
+KonsFinal6 <- KonsFinal6 %>% mutate(
+  wm = (pm*qm)/M,
+  ws = (ps*qs)/M,
+  wd = (pd*qd)/M,
+  wt = (pt*qt)/M
+)
+```
+
+Edit Rural and Education.
+```{r Rur Educ, include=FALSE, message=FALSE, warning=FALSE}
+KonsFinal7 <- KonsFinal6 %>% 
+  mutate(klas = ifelse(klas == 2, 0, 1)) #1 High Educ (D1 and Above)
+
+KonsFinal7 <- KonsFinal7 %>% select(-qm, -qs, -qd, -qt) %>% rename(expfd = M)
+rm(KonsFinal6)
+write_dta(KonsFinal7, "KonsFinal77K.dta")
+```
+
+Descriptive Stats. and Results
+```{r Descriptive Stats, message=FALSE, warning=FALSE, results='asis', echo=FALSE}
+#### Summary Statistics and Tabulation ####
+KonsFinal7 %>% split(.$pendidikan) %>% walk(~ stargazer(as.data.frame(.), type = 'latex',
+          title = "Summary Statistics for Low Education",
+          summary.stat = c("n", "mean", "sd"),
+          keep = c("art", "expend", "wm", "ws", "wd", "wt"),
+          covariate.labels = c("Family Size", "Family Expend. (Per Cap.)",
+                               "Noodle Expend. Share",
+                               "Snack Expend. Share", "Processed Meat Expend. Share", 
+                               "Bottled Tea Expend. Share"),
+          font.size = "small"))
+
+KonsFinal7 %>% split(.$klas) %>% walk(~ stargazer(as.data.frame(.), type = 'latex',
+          title = "Summary Statistics for High Education",
+          summary.stat = c("n", "mean", "sd"),
+          keep = c("art", "expend", "wm", "ws", "wd", "wt"),
+          covariate.labels = c("Family Size", "Family Expend. (Per Cap.)",
+                               "Noodle Expend. Share",
+                               "Snack Expend. Share", "Processed Meat Expend. Share", 
+                               "Bottled Tea Expend. Share"),
+          font.size = "small"))
+
+KonsFinal7 %>% group_by(pendidikan) %>%
+  summarize(Obs. = n(),
+            Percentage = n()/1805,
+            Noodle_Expend_Share = mean(wm),
+            Snack_Expend_Share = mean(ws),
+            ProcessedMeat_Expend_Share = mean(wd),
+            BottledTea_Expend_Share = mean(wt))
+
+KonsFinal7 %>% group_by(klas) %>%
+  summarize(Obs. = n(),
+            Percentage = n()/1805,
+            Noodle_Expend_Share = mean(wm),
+            Snack_Expend_Share = mean(ws),
+            ProcessedMeat_Expend_Share = mean(wd),
+            BottledTea_Expend_Share = mean(wt))
+
+rm(KonsFinal, KonsMakanan, KonsNonMakanan, KOR)
+```
+
+AIDS Results.
+```{r AIDS Results, message=FALSE, warning=FALSE, echo=FALSE}
+#### AIDS Estimation ####
+priceNames <- c("pm", "ps", "pd", "pt")
+shareNames <- c("wm", "ws", "wd", "wt")
+
+AIDSResult <- aidsEst(priceNames, shareNames, 
+                         "expfd", data = as.data.frame(KonsFinal7), 
+                         method = "IL", priceIndex = "L",
+                         shifterNames = c("klas", "pendidikan", "art"))
+print(AIDSResult)
+summary(AIDSResult)
+
+#### AIDS Theory Consistency Check ####
+AIDSCoef <- coef(AIDSResult)
+AIDSCoef$alpha0 <- 1
+aidsConsist(priceNames, "expfd", coef = AIDSCoef, data = as.data.frame(KonsFinal7))
+
+#### Demand Elasticities ####
+AdjustAlpha <- function(x) {
+  sum(AIDSCoef$alpha[x]) + sum(AIDSCoef$delta[x,1]*mean(KonsFinal7$klas), AIDSCoef$delta[x,2]*mean(KonsFinal7$pendidikan), AIDSCoef$delta[x,3]*mean(KonsFinal7$art))
+}
+
+AIDSCoef$alpha[1] <- AdjustAlpha(1)
+AIDSCoef$alpha[2] <- AdjustAlpha(2)
+AIDSCoef$alpha[3] <- AdjustAlpha(3)
+AIDSCoef$alpha[4] <- AdjustAlpha(4)
+
+AIDSCoef$alpha
+AIDSCoef <- AIDSCoef[-5]
+
+pMeans <- colMeans(KonsFinal7[, priceNames])
+wMeans <- colMeans(KonsFinal7[, shareNames])
+AIDSElas <- aidsElas(AIDSCoef, prices = pMeans, shares = wMeans)
+print(AIDSElas)
+
+```
+
+Ramsey Rule.
+```{r Ramsey Rule, message=FALSE, warning=FALSE, echo=FALSE}
+#### Hicksian (compensated) Price Elasticities Result ####
+em <- 0.3957537
+es <- 0.4309722
+ed <- 0.4301308
+et <- 0.5504127
+tax_t <- 0.09 #1500/L = 1.5/ml * 250ml = Rp375 ~ 9% Bottled Tea Price
+
+#### Ramsey Rule Calculation ####
+tax_m <- tax_t * et / em
+tax_s <- tax_t * et / es
+tax_d <- tax_t * et / ed
+
+print(round(tax_m*100))
+print(round(tax_s*100))
+print(round(tax_d*100))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
